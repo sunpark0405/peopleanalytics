@@ -1,0 +1,81 @@
+---
+title: "Employee Attrition"
+author: "Sun Park"
+date: "11/9/2021"
+output: html_document
+---
+
+### Employee Attrition Using Kaggle
+
+Dataset is available on Kaggle from multiple accounts: 
+
+- https://www.kaggle.com/pavansubhasht/ibm-hr-analytics-attrition-dataset
+- https://www.kaggle.com/mfaisalqureshi/hr-analytics-and-job-prediction
+
+The dataset is fictional and was created by IBM. 
+
+The dataset includes various variables that measure employee behavior in a company (i.e. years of working). I am using an Integrated Development Environment called *RStudio*, which is an application that allows to compute mainly in R, but also lets users to use other programming languages such as SQL. I utilized a combination of programming languages such as SQL and R to understand the potential underlying mechanisms of why employees may decide to leave their company.
+
+The report is ordered in the following way: 
+1) Code (either in SQL or R)
+2) Results from the code
+3) Explanation and interpretation of the code and results 
+
+#### Loading Dataset into Working Environment using R
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(sjPlot)
+emp <- read_csv("/Users/hyunsunpark/Desktop/Research/WA_Fn-UseC_-HR-Employee-Attrition.csv")
+emp$Attrition <- ifelse(emp$Attrition == "Yes", 1, 0) #YES = 1, NO = 0
+```
+
+Using R, the dataset in csv format is loaded as "emp" into the working environment. The outcome I wanted to observe was _attrition_, and since the variable "attrition" was recorded as either "Yes" or "No," I recoded "attrition" into numeric values so that attrition was more measurable when computed with different variables. With the recode, a value of "1" with the variable "attrition" would indicate that the employee resigned, while a value of "0" would mean that the employee is currently with the company. 
+
+According to the dataset description provided on Kaggle, variables that asked employees' attitudes (i.e. job satisfaction) were on a 4-point scale, with 1 being equivalent to "low" or "bad", while 4 meaning "very high" or "best/excellent." 
+
+#### Observe Simple Statistics using SQL 
+
+```{r, message=FALSE}
+library(sqldf)
+sqldf("SELECT Department, count(*) as Attrition, avg(JobSatisfaction) as avg_jobsat, avg(JobInvolvement) as avg_jobinvolve, avg(PerformanceRating) as avg_perfrate FROM emp WHERE Attrition = 1 GROUP BY Department ORDER BY Attrition DESC LIMIT 10")
+```
+
+Using SQL, I tabulated the means of 3 potential factors (employees' job satisfaciton, job involvement, and performance rating) that may contribute to employees leaving the company. The _sqldf()_ function was used to write my code in SQL but print the results out in R format. 
+
+From the results shown above, there were 3 departments that the dataset included, and the department that had the most employees resigning was _Research and Development_. The department had a total of 133 resignations. Their average job satisfaction rate was 2.46 out of 4, average job involvement was 2.56 out of 4, and average performance rating was 3.20 out of 4. Calculating the mean of only 3 variables do not tell much about the potential reasons why employees are leaving the company, so more advanced statistical analysis was completed with R. 
+
+#### Examine Correlations using R
+
+```{r, message=FALSE}
+library("Hmisc")
+emptest <- emp[, c("YearsAtCompany", "YearsWithCurrManager", "TotalWorkingYears", "YearsInCurrentRole", "YearsSinceLastPromotion", "PerformanceRating", "JobSatisfaction", "JobInvolvement", "Attrition")]
+emptest_corr <- rcorr(as.matrix(emptest))
+emptest_corr$r 
+library(corrplot)
+corrplot(emptest_corr$r, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+Using R, I examined if there were any relationships worth exploring in the dataset. I selected a handful of factors that may be tied to employees leaving the company such as years at company, years with current manager, total number of working years, years in the current role, years since last promotion, performance rating, job satisfaction, and job involvement. The above results indicate that the selected factors are correlated with attrition, but do not share a strong relationship. For the relationships between factors, there is a strong correlation between the number of years at the company, years with the current manager, and years in the current role; this makes sense given that the number of years at the company would often reflect employees' current position at the company and their time spent together with their manager. However, correlational values can be limited in explain the relationship between different factors, so further investigation was done in the next statistical analysis. 
+
+#### Approaching Relationship between Attrition Factors Logistically using R
+
+```{r}
+emplm1 <- glm(Attrition ~ YearsAtCompany + YearsWithCurrManager + TotalWorkingYears + YearsInCurrentRole + YearsSinceLastPromotion + PerformanceRating + JobSatisfaction + JobInvolvement, data = emptest, family=binomial)
+emplm2 <- glm(Attrition ~ YearsAtCompany*YearsWithCurrManager + YearsAtCompany*TotalWorkingYears + YearsWithCurrManager*TotalWorkingYears + YearsAtCompany*YearsInCurrentRole + YearsWithCurrManager*YearsInCurrentRole + TotalWorkingYears*YearsInCurrentRole + YearsAtCompany*YearsSinceLastPromotion + YearsWithCurrManager*YearsSinceLastPromotion + TotalWorkingYears*YearsSinceLastPromotion + YearsInCurrentRole*YearsSinceLastPromotion + YearsAtCompany*PerformanceRating + YearsWithCurrManager*PerformanceRating + TotalWorkingYears*PerformanceRating + YearsInCurrentRole*PerformanceRating + YearsSinceLastPromotion*PerformanceRating + JobSatisfaction*YearsAtCompany + JobSatisfaction*YearsWithCurrManager + JobSatisfaction*TotalWorkingYears + JobSatisfaction*YearsInCurrentRole + JobSatisfaction*YearsSinceLastPromotion + JobSatisfaction*PerformanceRating + JobSatisfaction*JobInvolvement + JobInvolvement*YearsAtCompany + JobInvolvement*YearsWithCurrManager + JobInvolvement*TotalWorkingYears + JobInvolvement*YearsInCurrentRole + JobInvolvement*YearsSinceLastPromotion + JobInvolvement*PerformanceRating, data = emptest, family=binomial)
+tab_model(emplm1, emplm2, transform = NULL, auto.label = FALSE)
+```
+
+```{r}
+library(interactions)
+attrition_years <- glm(Attrition ~ YearsAtCompany * TotalWorkingYears, data = emp)
+plot_model(attrition_years, type = "int", mdrt.values = "meansd") #meansd = uses the mean value of the moderator as well as one standard deviation below and above mean value to plot the effect of the moderator on the independent variable
+```
+
+To delve into the relationship between the different factors and attrition further, logistic regression was computed. Logistic regression estimates the probability of a binary outcome occurring; it is ideal for investigating phenomenons like attrition since employees either stay or leave the organization. Based on the table above, the logistic model suggests that there are factors that are significantly associated with employees leaving the company, such as years with current manager, total number of working years, years in current role, years since last promotion, job satisfaction, and job involvement; the significance can be based off of the p-value noted as _p_ in the table. For instance, when holding all other factors constant, for each level more the employee reports that he or she is involved with his/her work, then, on average, the employee will 0.49 log-odds less likely to leave the company; on the other hand, when all other factors are not considered, for each year more the employee has not been promoted, on average, he or she will 0.13 log-odds more likely to leave the company. The unit of measurement for attrition, log-odds, simply means that the respondents are either more or less likely to stay with the company. 
+
+Additionally, the regression explored if a combination of factors were tied to attrition: would a long-time professional that worked at the company for many years more likely to stay at the company? The plot above illustrates that on average, the more number of years an employee was with the company and the more total number of working years as a professional, he or she is more likely to actually leave the company (the green line is the average number of total working years plus one standard deviation above). This may first come as a surprise, but does make sense in hindsight since an employee who has been in the workforce for a long time may have more likely been employed with other companies, and more likely to seek new employment opportunities if they wished.  
+
+Different factors can contribute to either employees remaining in the company or resigning, but based on the results, we cannot determine a causal relationship, so further qualitative data such as surveys could supplement to the quantitative findings above. Still, we could recommend to business leaders that there is a tendency for employees to leave if they have not been promoted for a long time, while they are more likely to stay if they have been working with the company, their manager, and their role for more years, and are satisfied and involved with their work. 
+
