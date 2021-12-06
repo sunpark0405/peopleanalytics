@@ -1,0 +1,120 @@
+---
+title: "FinalProject.DataAnalysis"
+author: "Sun Park"
+date: "12/2/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup}
+library(psych)
+library(plyr)
+naas2016 <- read.csv("/Users/hyunsunpark/Desktop/QMSS_FL20/Data Analysis/NAAS-data.csv")
+naas2016[naas2016 == 88 | naas2016 == 99] <- NA
+naas2016apia <- subset(naas2016, RACE < 3)
+table(naas2016apia$RACE)
+```
+
+```{r recodes}
+naas2016apia$american <- ifelse(naas2016apia$Q4_101 == 5, 1, 0) ## if identifies as solely American = 1, other identifications = 0
+table(naas2016apia$american)
+naas2016apia$asianid <- naas2016apia$Q4_2A ## How important is being ASIAN to your identity?
+table(naas2016apia$asianid)
+naas2016apia$sq.asianid <- naas2016apia$asianid * naas2016apia$asianid
+naas2016apia$promote <- ifelse(naas2016apia$Q5_2_A == 1, 1, 0) ## if unfairly denied promotion = 1, if not = 0
+table(naas2016apia$promote)
+naas2016apia$name <- ifelse(naas2016apia$Q5_1_I == 1, 1, 0) ## if people mispronounce name = 1, if not = 0
+table(naas2016apia$name)
+naas2016apia$mathsci <- ifelse(naas2016apia$Q5_1_J == 1, 1, 0) ## if people assume respondent good at math and science = 1, if not = 0 
+table(naas2016apia$mathsci)
+naas2016apia$amerid <- naas2016apia$Q4_2D ## How important is being AMERICAN to your identity?
+table(naas2016apia$amerid)
+naas2016apia$female <- ifelse(naas2016apia$S7 == 2, 1, 0)
+table(naas2016apia$female)
+
+naas2016apia$affect <- 4 - naas2016apia$Q4_3A ## what happens to Asian/Asian-Americans affect personally 
+table(naas2016apia$affect)
+naas2016apia$commcul <- ifelse(naas2016apia$Q4_5B == 1, 1, 0) ## Does America share a common culture? 
+table(naas2016apia$commcul)
+
+
+## variables that are currently not being used
+# affect ; commcul ; 
+```
+
+## Descriptive Statistics 
+```{r descriptive stats}
+describe(naas2016apia$american)
+describe(naas2016apia$asianid)
+describe(naas2016apia$promote)
+describe(naas2016apia$amerid)
+describe(naas2016apia$mathsci)
+describe(naas2016apia$name)
+describe(naas2016apia$female)
+```
+
+## Initial regression 
+```{r model promote}
+american.lm <- lm(promote ~ american, naas2016apia)
+summary(american.lm)
+```
+
+## Initial regression with only American Identification 
+```{r model amerid}
+amerid.lm <- lm(promote ~ american + amerid, naas2016apia)
+summary(amerid.lm)
+```
+
+## Initial regression with only Asian Identification 
+```{r model asianid}
+asianid.lm <- lm(promote ~ american + asianid, naas2016apia)
+summary(asianid.lm)
+```
+
+## Second regression with both American and Asian Identification  
+```{r model amerid asianid}
+aaid.lm <- lm(promote ~ american + amerid + asianid, naas2016apia)
+summary(aaid.lm)
+```
+
+## Third regression with both American and Asian Identification as interaction
+```{r model amerid:asianid}
+aaidint.lm <- lm(promote ~ american + amerid*asianid + amerid + asianid  + female, naas2016apia)
+summary(aaidint.lm)
+```
+
+```{r plot}
+library(ggplot2)
+plot_aaid <- ggplot(naas2016apia, aes(x = asianid, y = promote, group = amerid, color = amerid))
+plot_aaid + stat_smooth(method = "lm", se = F)
+```
+
+## Fourth regression with interaction of identifications and Asian stereotypes
+```{r model stereo}
+stereo.lm <- lm(promote ~ american + asianid:amerid + name + mathsci + asianid + amerid + female, naas2016apia)
+summary(stereo.lm)
+```
+
+```{r anova test}
+anova(aaidint.lm, stereo.lm$model)
+```
+
+
+## Fifth regression as logistic regression
+```{r logit}
+asianid.lgt <- glm(promote ~ american + asianid, naas2016apia, family = binomial)
+summary(asianid.lgt)
+```
+
+## Sixth regression as logistic regression with additional predictors
+```{r logit stereo}
+stereo.lgt <- glm(promote ~ american + asianid + amerid + female + asianid:amerid + name + mathsci, naas2016apia, family = binomial)
+summary(stereo.lgt)
+```
+
+```{r anova}
+anova(stereo.lgt, test = "Chisq")
+library(pscl)
+pR2(stereo.lgt)
+```
