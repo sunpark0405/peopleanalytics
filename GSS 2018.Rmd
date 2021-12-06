@@ -1,0 +1,59 @@
+---
+title: "GSS 2018"
+author: "Sun Park"
+date: "6/28/2021"
+output: html_document
+---
+
+```{r setup}
+library(haven)
+gss <- read_sav('/Users/hyunsunpark/Desktop/Research/GSS2018.sav')
+```
+
+```{r, include=FALSE}
+#HRS1 = continuous
+#PRESTG10 = continuous
+#AGE = continuous
+#WWWHR = continuous
+#YEARSUSA = continuous 
+#How long have you worked in your present job for your current employer? (ARDA NOTE: .25 = less than 6 months; .75=6 to 11.9 months) (YEARSJOB)
+#During a typical week, about what percentage of your total time at work would you normally spend using different types of electronic technologies (such as computers, tablets, smart phones, cash registers, scanners, GPS devices, robotic devices, and so on)? (USETECH)
+#About how much do you weigh without shoes? (WEIGHT)
+#In the past 12 months, have you participated in any of these stress management or stress reduction programs? (STRESS12)
+```
+
+## Variables
+* Continuous
+  - HRS1: _How many hours did you work last week, at all jobs?_
+  - PRESTG10: _Respondent's occupational prestige score_
+  - AGE: _Respondent's age_ 
+  - USETECH: _During a typical week, about what percentage of your total time at work would you normally spend using different types of electronic technologies (such as computers, tablets, smart phones, cash registers, scanners, GPS devices, robotic devices, and so on)?_
+  - YEARSJOB: _How long have you worked in your present job for your current employer? (ARDA NOTE: .25 = less than 6 months; .75=6 to 11.9 months)_ 
+* Categorical
+  - SPVTRFAIR: _My supervisor treats me fairly_
+* Outcome (Binary)
+  - EMPINPUT: _Some companies have organized workplace decision-making in ways to get more employee input and involvement. Are you personally involved in any group, team, committee, or task force that addresses issues such as product quality, cost cutting, productivity, health and safety, or other workplace issues?_
+
+```{r, message=FALSE}
+gss$EMPINPUT <- ifelse(gss$EMPINPUT == 2, 0, 1) #YES = 1, NO = 0 
+gss$SPVTRFAIR <- 5 - gss$SPVTRFAIR #NOT AT ALL TRUE = 1, VERY TRUE = 4
+library("Hmisc")
+gsstest <- gss[, c("HRS1", "PRESTG10", "AGE", "USETECH", "YEARSJOB", "SPVTRFAIR", "EMPINPUT")]
+gsstest_corr <- rcorr(as.matrix(gsstest))
+gsstest_corr$r 
+```
+
+## Logistic Regression
+* All variables are statistically significant; AGE is marginally significant
+* Interaction effect between AGE and years of YEARSJOB 
+
+```{r}
+lm1 <- glm(EMPINPUT ~ HRS1 + PRESTG10 + AGE + USETECH + YEARSJOB + SPVTRFAIR, gsstest, family=binomial)
+summary(lm1)
+```
+
+```{r}
+lm2 <- glm(EMPINPUT ~ HRS1 + PRESTG10 + AGE + USETECH + YEARSJOB + SPVTRFAIR + AGE*YEARSJOB, gsstest, family=binomial)
+summary(lm2)
+```
+
