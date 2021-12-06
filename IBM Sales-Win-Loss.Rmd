@@ -1,0 +1,34 @@
+---
+title: "IBM Sales-Win-Loss"
+author: "Sun Park"
+date: "7/3/2021"
+output: html_document
+---
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(sjPlot)
+sales <- read_csv("/Users/hyunsunpark/Downloads/WA_Fn-UseC_-Sales-Win-Loss.csv") #https://www.kaggle.com/thatbrock/ibm-watson-saleswinloss
+```
+
+```{r, message=FALSE}
+library("Hmisc")
+sales$`Opportunity Result`[sales$`Opportunity Result` == "Loss"] <- 0
+sales$`Opportunity Result`[sales$`Opportunity Result` == "Won"] <- 1
+sales$`Opportunity Result` <- as.numeric(sales$`Opportunity Result`)
+
+salestest <- sales[, c("Opportunity Result", "Sales Stage Change Count", "Total Days Identified Through Closing", "Total Days Identified Through Qualified", "Client Size By Revenue", "Client Size By Employee Count", "Deal Size Category")]
+salestest_corr <- rcorr(as.matrix(salestest))
+salestest_corr$r 
+```
+
+```{r, message=FALSE}
+library(psych)
+describe(salestest)
+```
+
+```{r, warning=FALSE}
+saleslm1 <- glm(`Opportunity Result` ~ `Sales Stage Change Count` + `Total Days Identified Through Closing` + `Total Days Identified Through Qualified` + `Client Size By Revenue` + `Client Size By Employee Count` + `Deal Size Category`, data = salestest, family=binomial)
+saleslm2 <- glm(`Opportunity Result` ~ `Sales Stage Change Count`*`Total Days Identified Through Closing` + `Sales Stage Change Count`*`Client Size By Revenue` + `Sales Stage Change Count`*`Client Size By Employee Count` + `Sales Stage Change Count`*`Deal Size Category` + `Total Days Identified Through Closing`*`Client Size By Revenue` + `Total Days Identified Through Closing`*`Client Size By Employee Count` + `Total Days Identified Through Closing`*`Deal Size Category` + `Client Size By Revenue`*`Client Size By Employee Count` + `Client Size By Revenue`*`Deal Size Category` + `Client Size By Employee Count`*`Deal Size Category`, data = salestest, family=binomial)
+tab_model(saleslm1, saleslm2, transform = NULL, auto.label = FALSE)
+```
